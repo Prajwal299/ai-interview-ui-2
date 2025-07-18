@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Brain, 
   Plus, 
@@ -19,27 +20,46 @@ import {
 interface Campaign {
   id: number;
   name: string;
-  description?: string;
-  status: 'draft' | 'active' | 'completed';
-  candidates_count: number;
+  job_description: string;
+  status: 'created' | 'running' | 'completed';
+  user_id: number;
   created_at: string;
+  candidates_count: number;
+  questions_count: number;
 }
 
-const Dashboard = () => {
+const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+  const location = useLocation();
 
   useEffect(() => {
+    // Initial fetch
     fetchCampaigns();
-  }, []);
+
+    // Set up polling
+    const intervalId = setInterval(fetchCampaigns, 10000); // Poll every 10 seconds
+
+    // Clean up interval on component unmount
+    return () => clearInterval(intervalId);
+  }, [location]);
 
   const fetchCampaigns = async () => {
     try {
-      const response = await apiClient.getCampaigns() as { campaigns?: Campaign[] };
-      setCampaigns(response.campaigns || []);
-    } catch (error) {
-      console.error('Failed to fetch campaigns:', error);
+      setIsLoading(true);
+      console.log('Fetching campaigns from /api/campaigns...');
+      const response = await apiClient.getCampaigns();
+      console.log('Campaigns response:', response.data);
+      setCampaigns(response.data.campaigns || []);
+    } catch (error: any) {
+      console.error('Failed to fetch campaigns:', error.response?.data || error);
+      toast({
+        title: 'Error fetching campaigns',
+        description: error.response?.data?.message || 'Failed to load campaigns. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
@@ -47,15 +67,17 @@ const Dashboard = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-success text-success-foreground';
-      case 'completed': return 'bg-muted text-muted-foreground';
-      default: return 'bg-secondary text-secondary-foreground';
+      case 'running':
+        return 'bg-green-500 text-white';
+      case 'completed':
+        return 'bg-gray-500 text-white';
+      default:
+        return 'bg-blue-500 text-white';
     }
   };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -65,11 +87,12 @@ const Dashboard = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-foreground">AI Interview Screener</h1>
-                <p className="text-sm text-muted-foreground">Welcome back, {user?.name || user?.email}</p>
+                <p className="text-sm text-muted-foreground">
+                  Welcome back, {user?.username || user?.email || 'User'}
+                </p>
               </div>
             </div>
-            
-            <Link to="/campaigns/new">
+            <Link to="/create-campaign">
               <Button>
                 <Plus className="w-4 h-4 mr-2" />
                 New Campaign
@@ -80,9 +103,8 @@ const Dashboard = () => {
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
+          <Card className="shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center space-x-2">
                 <FileText className="w-5 h-5 text-muted-foreground" />
@@ -92,7 +114,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center space-x-2">
                 <Users className="w-5 h-5 text-muted-foreground" />
@@ -104,19 +126,19 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center space-x-2">
                 <Phone className="w-5 h-5 text-muted-foreground" />
                 <span className="text-sm font-medium text-muted-foreground">Active Campaigns</span>
               </div>
               <p className="text-2xl font-bold mt-2">
-                {campaigns.filter(c => c.status === 'active').length}
+                {campaigns.filter(c => c.status === 'running').length}
               </p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center space-x-2">
                 <BarChart3 className="w-5 h-5 text-muted-foreground" />
@@ -129,8 +151,7 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Campaigns List */}
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Recent Campaigns</CardTitle>
             <CardDescription>Manage your interview screening campaigns</CardDescription>
@@ -138,8 +159,8 @@ const Dashboard = () => {
           <CardContent>
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin" />
-                <span className="ml-2">Loading campaigns...</span>
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Loading campaigns...</span>
               </div>
             ) : campaigns.length === 0 ? (
               <div className="text-center py-8">
@@ -148,7 +169,7 @@ const Dashboard = () => {
                 <p className="text-muted-foreground mb-4">
                   Create your first campaign to start screening candidates
                 </p>
-                <Link to="/campaigns/new">
+                <Link to="/create-campaign">
                   <Button>
                     <Plus className="w-4 h-4 mr-2" />
                     Create Campaign
@@ -164,13 +185,13 @@ const Dashboard = () => {
                   >
                     <div className="flex-1">
                       <div className="flex items-center space-x-3">
-                        <h3 className="font-medium">{campaign.name}</h3>
+                        <h3 className="font-medium text-foreground">{campaign.name}</h3>
                         <Badge className={getStatusColor(campaign.status)}>
-                          {campaign.status}
+                          {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
                         </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {campaign.description || 'No description'}
+                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                        {campaign.job_description || 'No description provided'}
                       </p>
                       <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
                         <span className="flex items-center">
@@ -179,18 +200,21 @@ const Dashboard = () => {
                         </span>
                         <span className="flex items-center">
                           <Calendar className="w-4 h-4 mr-1" />
-                          {new Date(campaign.created_at).toLocaleDateString()}
+                          {new Date(campaign.created_at).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
                         </span>
                       </div>
                     </div>
-                    
                     <div className="flex items-center space-x-2">
                       <Link to={`/campaigns/${campaign.id}`}>
                         <Button variant="outline" size="sm">
                           View Details
                         </Button>
                       </Link>
-                      {campaign.status === 'draft' && (
+                      {campaign.status === 'created' && (
                         <Link to={`/campaigns/${campaign.id}/start`}>
                           <Button size="sm">
                             Start Campaign

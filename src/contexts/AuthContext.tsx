@@ -1,20 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, isAuthenticated, removeAuthToken, setAuthToken } from '@/lib/auth';
 import { apiClient } from '@/lib/api';
+import { User, isAuthenticated, removeAuthToken, setAuthToken } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 
 interface AuthResponse {
-  token: string;
-  user?: User;
+  access_token: string;
+  user: User;
   message?: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name?: string) => Promise<void>;
-  logout: () => void;
+  login: (username: string, password: string) => Promise<void>;
+  register: (username: string, email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,72 +33,87 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
 
   useEffect(() => {
-    // Check if user is authenticated on app start
     if (isAuthenticated()) {
-      // In a real app, you might want to validate the token with the backend
-      // For now, we'll assume the token is valid if it exists
-      setUser({ id: 1, email: 'user@example.com' }); // This should come from token or API
+      setUser({ id: '', username: 'unknown', email: 'unknown' });
+      console.log('AuthContext - Token found:', localStorage.getItem('auth_token'));
+    } else {
+      console.log('AuthContext - No token found');
     }
     setIsLoading(false);
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (username: string, password: string) => {
     try {
       setIsLoading(true);
-      const response = await apiClient.login(email, password) as AuthResponse;
-      
-      if (response.token) {
-        setAuthToken(response.token);
-        setUser(response.user || { id: 1, email });
+      const response = await apiClient.login(username, password);
+      if (response.data.access_token) {
+        setAuthToken(response.data.access_token);
+        setUser(response.data.user);
+        console.log('Login - Token stored:', localStorage.getItem('auth_token'));
         toast({
-          title: "Login successful",
-          description: "Welcome back!",
+          title: 'Login successful',
+          description: 'Welcome back!',
         });
       }
-    } catch (error) {
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Invalid credentials';
+      console.error('Login error:', error.response?.data || error);
       toast({
-        title: "Login failed",
-        description: error instanceof Error ? error.message : "Invalid credentials",
-        variant: "destructive",
+        title: 'Login failed',
+        description: message,
+        variant: 'destructive',
       });
-      throw error;
+      throw new Error(message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const register = async (email: string, password: string, name?: string) => {
+  const register = async (username: string, email: string, password: string) => {
     try {
       setIsLoading(true);
-      const response = await apiClient.register(email, password, name) as AuthResponse;
-      
-      if (response.token) {
-        setAuthToken(response.token);
-        setUser(response.user || { id: 1, email, name });
+      const response = await apiClient.register(username, email, password);
+      if (response.data.user) {
+        await login(username, password);
         toast({
-          title: "Registration successful",
-          description: "Welcome to AI Interview Screener!",
+          title: 'Registration successful',
+          description: 'Welcome to AI Interview Screener!',
         });
       }
-    } catch (error) {
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Registration failed';
+      console.error('Register error:', error.response?.data || error);
       toast({
-        title: "Registration failed",
-        description: error instanceof Error ? error.message : "Registration failed",
-        variant: "destructive",
+        title: 'Registration failed',
+        description: message,
+        variant: 'destructive',
       });
-      throw error;
+      throw new Error(message);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    removeAuthToken();
-    setUser(null);
-    toast({
-      title: "Logged out",
-      description: "You have been logged out successfully.",
-    });
+  const logout = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        await apiClient.logout(token);
+      }
+      removeAuthToken();
+      setUser(null);
+      toast({
+        title: 'Logged out',
+        description: 'You have been logged out successfully.',
+      });
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      toast({
+        title: 'Logout failed',
+        description: 'Something went wrong during logout.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const value: AuthContextType = {

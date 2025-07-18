@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,35 +12,48 @@ import { useToast } from '@/hooks/use-toast';
 
 const CreateCampaign = () => {
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmitting || !user) {
+      console.log('Submit prevented - User:', user);
+      console.log('Submit prevented - Token:', localStorage.getItem('auth_token'));
+      if (!user) {
+        toast({
+          title: 'Authentication required',
+          description: 'Please log in to create a campaign.',
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
 
     setIsSubmitting(true);
     try {
+      console.log('Submitting campaign:', { name, job_description: jobDescription });
       const response = await apiClient.createCampaign({
         name,
-        description,
         job_description: jobDescription,
       });
+      console.log('Campaign response:', response.data);
 
       toast({
-        title: "Campaign created successfully",
-        description: "You can now upload candidates and start the campaign.",
+        title: 'Campaign created successfully',
+        description: 'You can now upload candidates and start the campaign.',
       });
 
-      navigate(`/campaigns/${(response as any).id}`);
-    } catch (error) {
+      navigate('/dashboard');
+    } catch (error: any) {
+      console.error('Campaign creation error:', error.response?.data || error);
       toast({
-        title: "Failed to create campaign",
-        description: error instanceof Error ? error.message : "An error occurred",
-        variant: "destructive",
+        title: 'Failed to create campaign',
+        description: error.response?.data?.message || 'An error occurred',
+        variant: 'destructive',
       });
     } finally {
       setIsSubmitting(false);
@@ -48,7 +62,6 @@ const CreateCampaign = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
-      {/* Header */}
       <div className="flex items-center space-x-4 mb-6">
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-4 h-4" />
@@ -59,7 +72,6 @@ const CreateCampaign = () => {
         </div>
       </div>
 
-      {/* Form */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
@@ -82,18 +94,6 @@ const CreateCampaign = () => {
                 onChange={(e) => setName(e.target.value)}
                 required
                 disabled={isSubmitting}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                placeholder="Brief description of this campaign..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={isSubmitting}
-                rows={3}
               />
             </div>
 

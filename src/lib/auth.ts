@@ -1,33 +1,21 @@
-// Authentication utilities for JWT token management
-export const AUTH_TOKEN_KEY = 'ai_interviewer_token';
-
 export interface User {
-  id: number;
+  id: string;
+  username: string;
   email: string;
-  name?: string;
 }
 
-export const setAuthToken = (token: string): void => {
-  localStorage.setItem(AUTH_TOKEN_KEY, token);
+export const setAuthToken = (token: string) => {
+  localStorage.setItem('auth_token', token);
+  console.log('Token set in localStorage:', token);
 };
 
-export const getAuthToken = (): string | null => {
-  return localStorage.getItem(AUTH_TOKEN_KEY);
+export const removeAuthToken = () => {
+  localStorage.removeItem('auth_token');
+  console.log('Token removed from localStorage');
 };
 
-export const removeAuthToken = (): void => {
-  localStorage.removeItem(AUTH_TOKEN_KEY);
-};
-
-export const isAuthenticated = (): boolean => {
-  return !!getAuthToken();
-};
-
-// API headers with authentication
-export const getAuthHeaders = () => {
-  const token = getAuthToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-  };
+export const isAuthenticated = () => {
+  const token = localStorage.getItem('auth_token');
+  console.log('isAuthenticated - Token exists:', !!token);
+  return !!token;
 };
