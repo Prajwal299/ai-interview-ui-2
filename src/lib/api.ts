@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://65.1.107.141:5000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://13.203.2.67:5000';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -52,6 +52,7 @@ export const apiClient = {
   getCampaignResults: (campaignId: number) =>
     api.get(`/api/campaigns/${campaignId}/results`),
   getUploadedCSVs: () => api.get('/api/csvs'),
+  getCampaignQuestions: (campaignId: number) => api.get(`/api/campaigns/${campaignId}/questions`),
 };
 
 export interface User {

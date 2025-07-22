@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiClient } from '@/lib/api';
+import { apiClient, removeAuthToken } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,8 +14,18 @@ import {
   BarChart3, 
   FileText,
   Calendar,
-  Loader2
+  Loader2,
+  LogOut,
+  User
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface Campaign {
   id: number;
@@ -29,11 +39,12 @@ interface Campaign {
 }
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Initial fetch
@@ -65,6 +76,29 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        await apiClient.logout(token);
+        removeAuthToken();
+        setUser(null);
+        toast({
+          title: 'Logged out',
+          description: 'You have been successfully logged out.',
+        });
+        navigate('/login');
+      }
+    } catch (error: any) {
+      console.error('Logout failed:', error.response?.data || error);
+      toast({
+        title: 'Logout failed',
+        description: error.response?.data?.message || 'Failed to log out. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'running':
@@ -92,12 +126,30 @@ const Dashboard: React.FC = () => {
                 </p>
               </div>
             </div>
-            <Link to="/create-campaign">
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                New Campaign
-              </Button>
-            </Link>
+            <div className="flex items-center space-x-4">
+              <Link to="/create-campaign">
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Campaign
+                </Button>
+              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex items-center space-x-2">
+                    <User className="w-4 h-4" />
+                    <span>{user?.username || user?.email || 'Profile'}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>{user?.username || user?.email || 'User'}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
       </header>
@@ -151,7 +203,7 @@ const Dashboard: React.FC = () => {
           </Card>
         </div>
 
-        <Card className="shadow-sm">
+        <Card className="shadowSM">
           <CardHeader>
             <CardTitle>Recent Campaigns</CardTitle>
             <CardDescription>Manage your interview screening campaigns</CardDescription>

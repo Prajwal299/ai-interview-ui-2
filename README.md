@@ -71,7 +71,7 @@ The app is configured to work with your Flask backend. The API client includes e
 1. **Environment Variables**
    Create a `.env` file based on `.env.example`:
    ```bash
-   VITE_API_URL=http://65.1.107.141:5000/api
+   VITE_API_URL=http://13.203.2.67:5000/api
    ```
 
 2. **Install Dependencies**
